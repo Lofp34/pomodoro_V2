@@ -35,6 +35,31 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
   const [timeRemainingInSeconds, setTimeRemainingInSeconds] = useState(WORK_DURATION_MINUTES * 60);
   const [activeTimerPhaseBeforePause, setActiveTimerPhaseBeforePause] = useState<PomodoroPhase>(PomodoroPhase.RUNNING);
   const [currentTimerTaskName, setCurrentTimerTaskName] = useState<string | null>(null);
+  const [targetEndTime, setTargetEndTime] = useState<number | null>(null);
+
+  // This new effect handles app visibility changes to sync the timer
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      // If the page becomes visible and we have a target end time...
+      if (document.visibilityState === 'visible' && targetEndTime) {
+        const newRemainingSeconds = Math.round((targetEndTime - Date.now()) / 1000);
+
+        if (newRemainingSeconds <= 0) {
+          // Timer finished while in background, trigger completion logic immediately
+          setTimeRemainingInSeconds(0);
+        } else {
+          // Sync the timer to the correct remaining time
+          setTimeRemainingInSeconds(newRemainingSeconds);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [targetEndTime]); // Re-bind if targetEndTime changes
 
   // Restore state from localStorage on initial mount
   useEffect(() => {
@@ -158,13 +183,23 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
   const handleStartWorkSession = async (taskName: string) => {
     // We request permission upon user action, which is best practice.
     await notificationService.requestPermission();
+    const duration = WORK_DURATION_MINUTES * 60;
+    setTimeRemainingInSeconds(duration);
+    setTargetEndTime(Date.now() + duration * 1000);
     setCurrentTimerTaskName(taskName);
     handleAppPhaseChange(PomodoroPhase.RUNNING);
   };
-  const handlePauseSession = () => handleAppPhaseChange(PomodoroPhase.PAUSED);
-  const handleResumeSession = () => handleAppPhaseChange(activeTimerPhaseBeforePause);
+  const handlePauseSession = () => {
+    setTargetEndTime(null); // Clear target time on pause
+    handleAppPhaseChange(PomodoroPhase.PAUSED);
+  }
+  const handleResumeSession = () => {
+    setTargetEndTime(Date.now() + timeRemainingInSeconds * 1000);
+    handleAppPhaseChange(activeTimerPhaseBeforePause);
+  }
   const handleStopSession = () => {
     console.log('[DEBUG] handleStopSession called. Resetting timer state.');
+    setTargetEndTime(null); // Clear target time on stop
     handleAppPhaseChange(PomodoroPhase.IDLE);
     setCurrentTimerTaskName(null);
     setLiveDescription('');
@@ -172,6 +207,11 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
   };
   const handleStartBreakSession = () => {
     setLiveDescription('');
+    const breakDuration = (pomodorosInCycle > 0 && pomodorosInCycle % 4 === 0) 
+      ? LONG_BREAK_DURATION_MINUTES * 60 
+      : SHORT_BREAK_DURATION_MINUTES * 60;
+    setTimeRemainingInSeconds(breakDuration);
+    setTargetEndTime(Date.now() + breakDuration * 1000);
     handleAppPhaseChange(PomodoroPhase.BREAK);
   }
 
