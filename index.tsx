@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import './index.css';
+import './src/index.css';
 import { WORK_DURATION_MINUTES } from './constants'; // Example import, not strictly needed here but good practice
 
 // This ensures process.env.API_KEY can be accessed.
