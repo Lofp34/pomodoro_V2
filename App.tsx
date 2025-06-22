@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 import { User, PomodoroSession, PomodoroPhase, AppView } from './types';
 import { supabaseService } from './services/supabaseService';
 import { WORK_DURATION_MINUTES, SHORT_BREAK_DURATION_MINUTES, LONG_BREAK_DURATION_MINUTES, APP_NAME, DOCUMENT_TITLE } from './constants';
@@ -8,7 +9,7 @@ import Chat from './components/Chat';
 import Auth from './components/Auth';
 import Modal from './components/Modal';
 import DictationInput from './components/DictationInput';
-import { TimerIcon, HistoryIcon, ChatIcon, LogoutIcon, InfoIcon } from './components/icons';
+import { TimerIcon, HistoryIcon, ChatIcon, LogoutIcon, InfoIcon, MicIcon } from './components/icons';
 import { geminiService } from './services/geminiService';
 
 const App: React.FC = () => {
@@ -25,6 +26,17 @@ const App: React.FC = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [sessionToEdit, setSessionToEdit] = useState<PomodoroSession | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // --- Speech Recognition Test ---
+  const { listening, browserSupportsSpeechRecognition } = useSpeechRecognition();
+  const handleTestListen = () => {
+    if (listening) {
+      SpeechRecognition.stopListening();
+    } else {
+      SpeechRecognition.startListening({ continuous: true, language: 'fr-FR' });
+    }
+  };
+  // --- End Speech Recognition Test ---
 
   const [pomodorosInCycle, setPomodorosInCycle] = useState(0); 
   const [timeRemainingInSeconds, setTimeRemainingInSeconds] = useState(WORK_DURATION_MINUTES * 60);
@@ -298,6 +310,14 @@ const App: React.FC = () => {
             <NavLink view={AppView.TIMER} label="Minuteur" icon={<TimerIcon className="w-6 h-6" />} />
             <NavLink view={AppView.HISTORY} label="Historique" icon={<HistoryIcon className="w-6 h-6" />} />
             <NavLink view={AppView.CHAT} label="Chat IA" icon={<ChatIcon className="w-6 h-6" />} />
+             {/* --- TEST BUTTON --- */}
+             {browserSupportsSpeechRecognition && (
+              <button onClick={handleTestListen} className="flex items-center space-x-3 px-4 py-3 rounded-lg w-full text-left bg-purple-600 text-white mt-4">
+                <MicIcon className="w-6 h-6" />
+                <span>Test Dictée {listening ? '(On)' : '(Off)'}</span>
+              </button>
+            )}
+            {/* --- END TEST BUTTON --- */}
           </div>
         </div>
         <div className="mt-auto pt-6">
