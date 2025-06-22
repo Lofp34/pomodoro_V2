@@ -9,6 +9,7 @@ import Modal from './Modal';
 import DictationInput from './DictationInput';
 import { TimerIcon, HistoryIcon, ChatIcon, LogoutIcon, InfoIcon } from './icons';
 import { geminiService } from '../services/geminiService';
+import { notificationService } from '../services/notificationService';
 
 interface PomodoroAppProps {
   user: User;
@@ -110,11 +111,13 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
         }, 1000);
     } else if (timeRemainingInSeconds === 0) {
         if (currentPhase === PomodoroPhase.RUNNING && currentTimerTaskName) {
+            notificationService.showNotification('Session de travail terminée !', 'Il est temps de prendre une pause bien méritée.');
             setTaskForDescription({ name: currentTimerTaskName, duration: WORK_DURATION_MINUTES });
             setPomodorosInCycle(prev => prev + 1);
             setIsDescriptionModalOpen(true); 
             setCurrentPhase(PomodoroPhase.DESCRIBING);
         } else if (currentPhase === PomodoroPhase.BREAK) {
+            notificationService.showNotification('La pause est terminée !', 'Prêt(e) à vous reconcentrer ?');
             setCurrentPhase(PomodoroPhase.IDLE);
             setTimeRemainingInSeconds(WORK_DURATION_MINUTES * 60);
             setCurrentTimerTaskName(null); 
@@ -152,7 +155,9 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
     }
   };
 
-  const handleStartWorkSession = (taskName: string) => {
+  const handleStartWorkSession = async (taskName: string) => {
+    // We request permission upon user action, which is best practice.
+    await notificationService.requestPermission();
     setCurrentTimerTaskName(taskName);
     handleAppPhaseChange(PomodoroPhase.RUNNING);
   };

@@ -1,0 +1,130 @@
+### Fiche Technique : Transformer une Application Web en PWA avec Backend Supabase
+
+Ce guide documente le processus et les patrons d'architecture que nous avons utilisés pour faire évoluer l'application Pomodoro. Il sert de feuille de route pour des projets similaires.
+
+#### Phase 1 : Initialisation et Configuration du Backend
+
+L'objectif est de mettre en place une base de données sécurisée et une API pour gérer les données de l'application.
+
+1.  **Contrôle de Version (Git & GitHub) :**
+    *   Toujours commencer par initialiser un dépôt Git : `git init`.
+    *   Connecter le dépôt local à un dépôt distant sur GitHub.
+    *   **Principe clé :** Commiter et pousser après chaque étape fonctionnelle majeure. Les messages de commit doivent être clairs (ex: `feat(auth): add email/password signup`, `fix(timer): resolve persistence bug`).
+
+2.  **Connexion au Projet Supabase (via MCP) :**
+    *   Pour interagir avec votre projet, je nécessite une configuration dans le fichier `.cursor/mcp.json`.
+    *   Ce fichier contient votre `project_id` Supabase et un **Jeton d'Accès Personnel (PAT)** que vous devez générer depuis votre compte Supabase.
+    *   **Sécurité :** Ce jeton est un secret. Il ne doit jamais être partagé publiquement ou commit dans le code.
+
+3.  **Création du Schéma de Base de Données (SQL) :**
+    *   Les tables doivent être créées avec des types de données clairs et des contraintes.
+    *   **Exemple (`pomodoro_sessions`) :**
+        ```sql
+        CREATE TABLE pomodoro_sessions (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL DEFAULT auth.uid(),
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          task_name TEXT NOT NULL,
+          task_description TEXT,
+          duration_minutes INT NOT NULL
+        );
+        ```
+    *   **Points importants :**
+        *   `id`: Une clé primaire unique.
+        *   `user_id`: Un lien vers l'utilisateur qui a créé l'enregistrement. `ON DELETE CASCADE` supprime les sessions si l'utilisateur est supprimé.
+        *   `DEFAULT auth.uid()`: Remplit automatiquement l'ID de l'utilisateur connecté.
+
+4.  **Sécurité au Niveau des Lignes (RLS - Row-Level Security) :**
+    *   **Non négociable.** C'est la fonctionnalité la plus critique pour la sécurité des données. Sans elle, n'importe quel utilisateur pourrait lire les données des autres.
+    *   Activer RLS sur chaque table contenant des données utilisateur.
+    *   Créer des politiques pour chaque opération (SELECT, INSERT, UPDATE, DELETE).
+    *   **Modèle de politique :**
+        ```sql
+        -- Permet aux utilisateurs de ne voir que leurs propres sessions
+        CREATE POLICY "Enable read access for own user" ON pomodoro_sessions
+        FOR SELECT USING (auth.uid() = user_id);
+
+        -- Permet aux utilisateurs de n'insérer que pour leur propre compte
+        CREATE POLICY "Enable insert for own user" ON pomodoro_sessions
+        FOR INSERT WITH CHECK (auth.uid() = user_id);
+        ```
+        *(Répéter pour UPDATE et DELETE)*
+
+#### Phase 2 : Architecture Frontend (React + Vite)
+
+1.  **Service d'Abstraction (`services/supabaseService.ts`) :**
+    *   Ne jamais appeler Supabase directement depuis les composants. Créer un "service" qui centralise toutes les interactions.
+    *   **Initialisation du client :** Utiliser les variables d'environnement Vite (`import.meta.env.VITE_...`).
+        ```typescript
+        // services/supabaseService.ts
+        import { createClient } from '@supabase/supabase-js';
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+        ```
+    *   Créer des fonctions pour chaque besoin : `login()`, `logout()`, `getPomodoroSessions()`, etc. Cela rend les composants plus propres et les appels à la base de données plus faciles à gérer.
+
+2.  **Gestion de l'Authentification et de l'État :**
+    *   **Le bug de persistance nous a appris la leçon la plus importante.** Les problèmes de "race condition" entre l'authentification asynchrone et la restauration de l'état sont courants.
+    *   **La solution robuste (Patron de la `key`) :**
+        1.  Le composant `App.tsx` est un simple conteneur qui gère l'état de connexion.
+        2.  Il écoute les changements via `onAuthStateChange`.
+        3.  Si l'utilisateur n'est pas connecté, il affiche le composant `Auth`.
+        4.  Si l'utilisateur **est** connecté, il affiche le composant principal de l'application (`PomodoroApp.tsx`) en lui passant l'ID de l'utilisateur comme `key`.
+            ```tsx
+            // App.tsx
+            if (!currentUser) return <Auth />;
+            return <PomodoroApp key={currentUser.id} user={currentUser} />;
+            ```
+        5.  **Pourquoi ça marche :** Changer la `key` force React à détruire complètement l'ancien composant et à en monter un tout nouveau. Cela garantit un état de départ 100% propre à chaque connexion, éliminant tous les conflits.
+
+3.  **Persistance de l'État dans `localStorage` :**
+    *   Cette logique doit se trouver à l'intérieur du composant principal (`PomodoroApp.tsx`).
+    *   **Lecture :** Un `useEffect` avec un tableau de dépendances vide `[]` (ou `[user.id]`) lit l'état depuis `localStorage` au montage du composant.
+    *   **Écriture :** Un second `useEffect` surveille les changements des variables d'état importantes et les sauvegarde dans `localStorage`.
+    *   **Clé unique par utilisateur :** Toujours utiliser une clé qui inclut l'ID de l'utilisateur pour éviter que les données d'un utilisateur ne "fuient" sur le compte d'un autre sur le même navigateur. (ex: `pomodoroTimerState_${user.id}`).
+
+#### Phase 3 : Transformation en Progressive Web App (PWA)
+
+1.  **Installation du Plugin Vite :**
+    *   `npm install vite-plugin-pwa --save-dev`
+
+2.  **Configuration (`vite.config.ts`) :**
+    *   Ajouter le plugin et le configurer avec un `manifest`.
+    *   Le `manifest` est le "passeport" de la PWA. Il décrit comment elle doit s'intégrer au système d'exploitation.
+        ```typescript
+        // vite.config.ts
+        import { VitePWA } from 'vite-plugin-pwa';
+
+        export default defineConfig({
+          plugins: [
+            react(),
+            VitePWA({
+              registerType: 'autoUpdate',
+              manifest: {
+                name: 'Pomodoro Intelligence',
+                short_name: 'PomodoroAI',
+                description: 'Un minuteur Pomodoro intelligent...',
+                theme_color: '#1a202c', // Couleur de la barre d'outils
+                icons: [ /* ... liste des icônes ... */ ]
+              }
+            })
+          ],
+        })
+        ```
+
+3.  **Icônes et Métadonnées :**
+    *   Créer les différentes tailles d'icônes requises (ex: 192x192, 512x512) et les placer dans le dossier `public`.
+    *   Ajouter les liens vers le manifeste et les icônes dans le `<head>` de `index.html`.
+
+#### Phase 4 : Déploiement et Débogage
+
+1.  **Déploiement Continu (Vercel) :**
+    *   Connecter le dépôt GitHub à un projet Vercel.
+    *   Configurer les variables d'environnement (`VITE_SUPABASE_URL`, etc.) dans les paramètres du projet Vercel, **pas dans le code**.
+    *   Chaque `git push` sur la branche `main` déclenchera un nouveau déploiement.
+
+2.  **Stratégie de Débogage Avancé :**
+    *   Face à un bug persistant, **arrêter de deviner**.
+    *   **Plan "Boîte Noire" :** Instrumenter le code en ajoutant des `console.log` ultra-descriptifs pour tracer le flux de données et d'exécution. Chaque log doit être préfixé (ex: `[DEBUG]`) et décrire l'action en cours.
+    *   Analyser la chronologie des logs dans la console du navigateur est la méthode la plus fiable pour trouver la cause première d'un bug complexe.
