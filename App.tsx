@@ -26,6 +26,8 @@ const App: React.FC = () => {
   const [sessionToEdit, setSessionToEdit] = useState<PomodoroSession | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [liveDescription, setLiveDescription] = useState('');
+  // This new state will prevent effects from running until auth is resolved and state is restored.
+  const [isInitialized, setIsInitialized] = useState(false); 
 
   const [pomodorosInCycle, setPomodorosInCycle] = useState(0); 
   const [timeRemainingInSeconds, setTimeRemainingInSeconds] = useState(WORK_DURATION_MINUTES * 60);
@@ -46,7 +48,6 @@ const App: React.FC = () => {
           const savedStateJSON = localStorage.getItem(`pomodoroTimerState_${user.id}`);
           if (savedStateJSON) {
             const savedState = JSON.parse(savedStateJSON);
-            // Restore state if it was active
             if (savedState.currentPhase === PomodoroPhase.RUNNING || savedState.currentPhase === PomodoroPhase.PAUSED) {
               setCurrentPhase(savedState.currentPhase);
               setTimeRemainingInSeconds(savedState.timeRemainingInSeconds);
@@ -54,7 +55,8 @@ const App: React.FC = () => {
               setCurrentTimerTaskName(savedState.currentTimerTaskName);
               setLiveDescription(savedState.liveDescription);
               setActiveTimerPhaseBeforePause(savedState.activeTimerPhaseBeforePause);
-              return; // Exit here to prevent resetting state
+              setIsInitialized(true); // Mark initialization as complete
+              return; // Exit to prevent reset
             }
           }
         } catch (error) {
@@ -63,22 +65,21 @@ const App: React.FC = () => {
         
         // If no valid state was restored, reset to default.
         setCurrentPhase(PomodoroPhase.IDLE);
-        setSessions([]);
         setPomodorosInCycle(0);
         setTimeRemainingInSeconds(WORK_DURATION_MINUTES * 60);
-        setActiveView(AppView.TIMER);
         setCurrentTimerTaskName(null);
         setLiveDescription('');
       }
+      setIsInitialized(true); // Mark initialization as complete even if no user or state
     });
 
     return () => unsubscribe();
-  }, []); // This still only runs once on mount.
+  }, []); // This runs only once.
 
   // Effect to save state to localStorage whenever it changes
   useEffect(() => {
-    // Only proceed if there is a logged-in user
-    if (!currentUser) return;
+    // Wait for initialization to complete before saving state
+    if (!isInitialized || !currentUser) return;
 
     const stateToSave = {
       currentPhase,
@@ -94,7 +95,7 @@ const App: React.FC = () => {
     } else {
       localStorage.removeItem(`pomodoroTimerState_${currentUser.id}`);
     }
-  }, [currentUser, currentPhase, timeRemainingInSeconds, pomodorosInCycle, currentTimerTaskName, liveDescription, activeTimerPhaseBeforePause]);
+  }, [isInitialized, currentUser, currentPhase, timeRemainingInSeconds, pomodorosInCycle, currentTimerTaskName, liveDescription, activeTimerPhaseBeforePause]);
 
   const fetchSessions = useCallback(async () => {
     if (currentUser) {
@@ -272,6 +273,15 @@ const App: React.FC = () => {
     }
   };
 
+
+  if (!isInitialized) {
+    // Render a loading state or nothing until initialization is complete
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-900">
+        <h1 className="text-2xl text-white">Chargement...</h1>
+      </div>
+    );
+  }
 
   if (!currentUser) {
     return <Auth />;
