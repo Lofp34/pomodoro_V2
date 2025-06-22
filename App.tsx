@@ -25,13 +25,54 @@ const App: React.FC = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [sessionToEdit, setSessionToEdit] = useState<PomodoroSession | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [liveDescription, setLiveDescription] = useState(''); // For live description input
+  const [liveDescription, setLiveDescription] = useState('');
 
   const [pomodorosInCycle, setPomodorosInCycle] = useState(0); 
   const [timeRemainingInSeconds, setTimeRemainingInSeconds] = useState(WORK_DURATION_MINUTES * 60);
   const [activeTimerPhaseBeforePause, setActiveTimerPhaseBeforePause] = useState<PomodoroPhase>(PomodoroPhase.RUNNING);
   const [currentTimerTaskName, setCurrentTimerTaskName] = useState<string | null>(null); // Name of the task actively being timed
 
+  // Effect to load state from localStorage on initial load
+  useEffect(() => {
+    try {
+      const savedStateJSON = localStorage.getItem('pomodoroTimerState');
+      if (savedStateJSON) {
+        const savedState = JSON.parse(savedStateJSON);
+        // Restore state only if a session was actively running or paused
+        if (savedState.currentPhase === PomodoroPhase.RUNNING || savedState.currentPhase === PomodoroPhase.PAUSED) {
+          setCurrentPhase(savedState.currentPhase);
+          setTimeRemainingInSeconds(savedState.timeRemainingInSeconds);
+          setPomodorosInCycle(savedState.pomodorosInCycle);
+          setCurrentTimerTaskName(savedState.currentTimerTaskName);
+          setLiveDescription(savedState.liveDescription);
+          setActiveTimerPhaseBeforePause(savedState.activeTimerPhaseBeforePause);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load timer state from localStorage", error);
+      // Clear corrupted state
+      localStorage.removeItem('pomodoroTimerState');
+    }
+  }, []); // Empty dependency array ensures this runs only once on mount
+
+  // Effect to save state to localStorage whenever it changes
+  useEffect(() => {
+    const stateToSave = {
+      currentPhase,
+      timeRemainingInSeconds,
+      pomodorosInCycle,
+      currentTimerTaskName,
+      liveDescription,
+      activeTimerPhaseBeforePause,
+    };
+    // Only save state if a session is active, otherwise clear it
+    if (currentPhase === PomodoroPhase.RUNNING || currentPhase === PomodoroPhase.PAUSED) {
+      localStorage.setItem('pomodoroTimerState', JSON.stringify(stateToSave));
+    } else {
+      // Clear storage if the timer is idle, on a break, or in description mode
+      localStorage.removeItem('pomodoroTimerState');
+    }
+  }, [currentPhase, timeRemainingInSeconds, pomodorosInCycle, currentTimerTaskName, liveDescription, activeTimerPhaseBeforePause]);
 
   useEffect(() => {
     document.title = DOCUMENT_TITLE;
@@ -151,6 +192,8 @@ const App: React.FC = () => {
   const handleStopSession = () => { // Effectively resets the current work/break session
     handleAppPhaseChange(PomodoroPhase.IDLE);
     setCurrentTimerTaskName(null);
+    setLiveDescription('');
+    localStorage.removeItem('pomodoroTimerState'); // Explicitly clear on stop
   };
   const handleStartBreakSession = () => {
     setLiveDescription(''); // Clear live description when a break starts
