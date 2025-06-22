@@ -37,22 +37,35 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
 
   // Restore state from localStorage on initial mount
   useEffect(() => {
+    console.log('[DEBUG] PomodoroApp Component Mounted. Attempting to restore state.');
     document.title = DOCUMENT_TITLE;
     try {
       const savedStateJSON = localStorage.getItem(`pomodoroTimerState_${user.id}`);
+      console.log(`[DEBUG] Reading from localStorage for key: pomodoroTimerState_${user.id}`);
+      console.log('[DEBUG] Raw data from localStorage:', savedStateJSON);
+
       if (savedStateJSON) {
         const savedState = JSON.parse(savedStateJSON);
+        console.log('[DEBUG] Parsed state:', savedState);
+        
         if (savedState.currentPhase === PomodoroPhase.RUNNING || savedState.currentPhase === PomodoroPhase.PAUSED) {
+          console.log('[DEBUG] Valid active state found. Restoring state now.');
           setCurrentPhase(savedState.currentPhase);
           setTimeRemainingInSeconds(savedState.timeRemainingInSeconds);
           setPomodorosInCycle(savedState.pomodorosInCycle);
           setCurrentTimerTaskName(savedState.currentTimerTaskName);
           setLiveDescription(savedState.liveDescription);
           setActiveTimerPhaseBeforePause(savedState.activeTimerPhaseBeforePause);
+          console.log('[DEBUG] STATE RESTORED SUCCESSFULLY.');
+        } else {
+          console.log('[DEBUG] State found, but phase is not active. Initializing default state.');
         }
+      } else {
+        console.log('[DEBUG] No state found in localStorage. Initializing default state.');
       }
     } catch (error) {
-      console.error("Failed to load or parse timer state from localStorage", error);
+      console.error("[DEBUG] CRITICAL ERROR while restoring state:", error);
+      console.log('[DEBUG] Initializing default state due to error.');
     }
   }, [user.id]); // Only run on mount for this user
 
@@ -68,8 +81,12 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
     };
 
     if (currentPhase === PomodoroPhase.RUNNING || currentPhase === PomodoroPhase.PAUSED) {
-      localStorage.setItem(`pomodoroTimerState_${user.id}`, JSON.stringify(stateToSave));
+      const stateJSON = JSON.stringify(stateToSave);
+      console.log(`[DEBUG] SAVING to localStorage for key: pomodoroTimerState_${user.id}`);
+      console.log('[DEBUG] State object being saved:', stateToSave);
+      localStorage.setItem(`pomodoroTimerState_${user.id}`, stateJSON);
     } else {
+      console.log(`[DEBUG] REMOVING from localStorage for key: pomodoroTimerState_${user.id} because phase is ${currentPhase}`);
       localStorage.removeItem(`pomodoroTimerState_${user.id}`);
     }
   }, [user.id, currentPhase, timeRemainingInSeconds, pomodorosInCycle, currentTimerTaskName, liveDescription, activeTimerPhaseBeforePause]);
@@ -142,6 +159,7 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
   const handlePauseSession = () => handleAppPhaseChange(PomodoroPhase.PAUSED);
   const handleResumeSession = () => handleAppPhaseChange(activeTimerPhaseBeforePause);
   const handleStopSession = () => {
+    console.log('[DEBUG] handleStopSession called. Resetting timer state.');
     handleAppPhaseChange(PomodoroPhase.IDLE);
     setCurrentTimerTaskName(null);
     setLiveDescription('');
