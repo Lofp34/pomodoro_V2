@@ -63,8 +63,10 @@ export const supabaseService = {
     if (!user) throw new Error("User not authenticated.");
 
     const newSessionPayload = {
-      ...sessionData,
-      user_id: user.id, // Ensure your table uses 'user_id'
+      user_id: user.id,
+      task_name: sessionData.taskName,
+      duration_minutes: sessionData.durationMinutes,
+      task_description: sessionData.taskDescription,
     };
     
     // Assuming table name is 'pomodoro_sessions'
