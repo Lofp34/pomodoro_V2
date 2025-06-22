@@ -62,9 +62,12 @@ You need to connect the app to your own Supabase project.
 
     VITE_SUPABASE_URL="YOUR_SUPABASE_PROJECT_URL"
     VITE_SUPABASE_ANON_KEY="YOUR_SUPABASE_PUBLIC_ANON_KEY"
+
+    # Get this value from Google AI Studio
+    VITE_GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
     ```
 
-3.  Replace the placeholder values with your actual Supabase URL and Public Anon Key.
+3.  Replace the placeholder values with your actual Supabase URL, Public Anon Key, and your Gemini API Key.
 
 ### 4. Run the Development Server
 
@@ -92,6 +95,7 @@ This project is optimized for deployment on [Vercel](https://vercel.com/).
     - Add the following variables:
       - `VITE_SUPABASE_URL`: Your Supabase project URL.
       - `VITE_SUPABASE_ANON_KEY`: Your Supabase public anon key.
+      - `VITE_GEMINI_API_KEY`: Your Gemini API key.
 
 4.  **Deploy**:
     - Vercel will automatically detect that you are using Vite and configure the build settings.
