@@ -47,6 +47,11 @@ const DictationInput: React.FC<DictationInputProps> = ({
   }, [transcript, resetTranscript, listening]); // Added listening to dependency array
 
   const handleToggleListening = () => {
+    console.log('Toggling listening...');
+    console.log('Browser supports speech recognition:', browserSupportsSpeechRecognition);
+    console.log('Microphone available:', isMicrophoneAvailable);
+    console.log('Currently listening:', listening);
+
     if (listening) {
       SpeechRecognition.stopListening();
     } else {
