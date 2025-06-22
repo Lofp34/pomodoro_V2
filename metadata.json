@@ -1,0 +1,7 @@
+{
+  "name": "Pomodoro Intelligence",
+  "description": "An intelligent Pomodoro timer application with task tracking, history, and AI-powered chat analysis of your productivity. Features dictation for task descriptions.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
