@@ -160,9 +160,13 @@ const App: React.FC = () => {
 
     setIsSaving(true);
     try {
+      // Ensure the duration is an integer before saving.
+      // This handles cases where a float might be used for testing (e.g., 0.5 minutes).
+      const durationInMinutes = Math.round(taskForDescription.duration);
+
       await supabaseService.savePomodoroSession({
         taskName: taskForDescription.name,
-        durationMinutes: taskForDescription.duration,
+        durationMinutes: durationInMinutes,
         taskDescription: data.description,
       });
       await fetchSessions(); 
