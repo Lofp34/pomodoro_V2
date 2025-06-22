@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { PomodoroPhase, User } from '../types';
 import { PlayIcon, PauseIcon, StopIcon } from './icons'; // Removed ResetIcon as Stop serves this purpose now for IDLE state.
@@ -9,6 +8,8 @@ interface TimerProps {
   timeToDisplayInSeconds: number;
   pomodorosCompleted: number;
   currentWorkTaskName: string | null; // Name of the task currently in RUNNING or PAUSED state for display
+  liveDescription: string;
+  onLiveDescriptionChange: (description: string) => void;
   onStartWorkSession: (taskName: string) => void;
   onPauseSession: () => void;
   onResumeSession: () => void;
@@ -28,6 +29,8 @@ const Timer: React.FC<TimerProps> = ({
   timeToDisplayInSeconds,
   pomodorosCompleted,
   currentWorkTaskName,
+  liveDescription,
+  onLiveDescriptionChange,
   onStartWorkSession,
   onPauseSession,
   onResumeSession,
@@ -142,6 +145,22 @@ const Timer: React.FC<TimerProps> = ({
           </button>
         )}
       </div>
+      
+      {(appPhase === PomodoroPhase.RUNNING || appPhase === PomodoroPhase.PAUSED) && currentWorkTaskName && (
+        <div className="w-full mt-6">
+          <label htmlFor="live-description" className="block text-sm font-medium text-gray-400 mb-2 text-center">
+            Notes sur la tâche en cours...
+          </label>
+          <textarea
+            id="live-description"
+            value={liveDescription}
+            onChange={(e) => onLiveDescriptionChange(e.target.value)}
+            placeholder="Écrivez ici ce que vous faites, les idées, les blocages..."
+            className="w-full h-24 px-4 py-3 bg-gray-700 border border-gray-600 rounded-md shadow-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-gray-100 text-sm resize-none"
+            aria-label="Description de la tâche en direct"
+          />
+        </div>
+      )}
       
       {(appPhase !== PomodoroPhase.IDLE && appPhase !== PomodoroPhase.DESCRIBING) && (
          <p className="mt-6 text-sm text-gray-400">Pomodoros complétés ce cycle: {pomodorosCompleted}</p>
