@@ -32,31 +32,54 @@ const App: React.FC = () => {
   const [activeTimerPhaseBeforePause, setActiveTimerPhaseBeforePause] = useState<PomodoroPhase>(PomodoroPhase.RUNNING);
   const [currentTimerTaskName, setCurrentTimerTaskName] = useState<string | null>(null); // Name of the task actively being timed
 
-  // Effect to load state from localStorage on initial load
+  // This effect now handles both auth changes and state restoration.
   useEffect(() => {
-    try {
-      const savedStateJSON = localStorage.getItem('pomodoroTimerState');
-      if (savedStateJSON) {
-        const savedState = JSON.parse(savedStateJSON);
-        // Restore state only if a session was actively running or paused
-        if (savedState.currentPhase === PomodoroPhase.RUNNING || savedState.currentPhase === PomodoroPhase.PAUSED) {
-          setCurrentPhase(savedState.currentPhase);
-          setTimeRemainingInSeconds(savedState.timeRemainingInSeconds);
-          setPomodorosInCycle(savedState.pomodorosInCycle);
-          setCurrentTimerTaskName(savedState.currentTimerTaskName);
-          setLiveDescription(savedState.liveDescription);
-          setActiveTimerPhaseBeforePause(savedState.activeTimerPhaseBeforePause);
+    document.title = DOCUMENT_TITLE;
+    
+    const { unsubscribe } = supabaseService.onAuthStateChange((session) => {
+      const user = session?.user ?? null;
+      setCurrentUser(user as User | null);
+
+      if (user) {
+        // User is logged in, now decide whether to restore state or reset.
+        try {
+          const savedStateJSON = localStorage.getItem(`pomodoroTimerState_${user.id}`);
+          if (savedStateJSON) {
+            const savedState = JSON.parse(savedStateJSON);
+            // Restore state if it was active
+            if (savedState.currentPhase === PomodoroPhase.RUNNING || savedState.currentPhase === PomodoroPhase.PAUSED) {
+              setCurrentPhase(savedState.currentPhase);
+              setTimeRemainingInSeconds(savedState.timeRemainingInSeconds);
+              setPomodorosInCycle(savedState.pomodorosInCycle);
+              setCurrentTimerTaskName(savedState.currentTimerTaskName);
+              setLiveDescription(savedState.liveDescription);
+              setActiveTimerPhaseBeforePause(savedState.activeTimerPhaseBeforePause);
+              return; // Exit here to prevent resetting state
+            }
+          }
+        } catch (error) {
+          console.error("Failed to load or parse timer state from localStorage", error);
         }
+        
+        // If no valid state was restored, reset to default.
+        setCurrentPhase(PomodoroPhase.IDLE);
+        setSessions([]);
+        setPomodorosInCycle(0);
+        setTimeRemainingInSeconds(WORK_DURATION_MINUTES * 60);
+        setActiveView(AppView.TIMER);
+        setCurrentTimerTaskName(null);
+        setLiveDescription('');
       }
-    } catch (error) {
-      console.error("Failed to load timer state from localStorage", error);
-      // Clear corrupted state
-      localStorage.removeItem('pomodoroTimerState');
-    }
-  }, []); // Empty dependency array ensures this runs only once on mount
+    });
+
+    return () => unsubscribe();
+  }, []); // This still only runs once on mount.
 
   // Effect to save state to localStorage whenever it changes
   useEffect(() => {
+    // Only proceed if there is a logged-in user
+    if (!currentUser) return;
+
     const stateToSave = {
       currentPhase,
       timeRemainingInSeconds,
@@ -65,36 +88,13 @@ const App: React.FC = () => {
       liveDescription,
       activeTimerPhaseBeforePause,
     };
-    // Only save state if a session is active, otherwise clear it
+
     if (currentPhase === PomodoroPhase.RUNNING || currentPhase === PomodoroPhase.PAUSED) {
-      localStorage.setItem('pomodoroTimerState', JSON.stringify(stateToSave));
+      localStorage.setItem(`pomodoroTimerState_${currentUser.id}`, JSON.stringify(stateToSave));
     } else {
-      // Clear storage if the timer is idle, on a break, or in description mode
-      localStorage.removeItem('pomodoroTimerState');
+      localStorage.removeItem(`pomodoroTimerState_${currentUser.id}`);
     }
-  }, [currentPhase, timeRemainingInSeconds, pomodorosInCycle, currentTimerTaskName, liveDescription, activeTimerPhaseBeforePause]);
-
-  useEffect(() => {
-    document.title = DOCUMENT_TITLE;
-    
-    // Subscribe to auth state changes
-    const { unsubscribe } = supabaseService.onAuthStateChange((session) => {
-      const user = session?.user ?? null;
-      setCurrentUser(user as User | null); // Casting might be needed depending on type definitions
-      if (user) {
-        // Reset app state on login
-        setCurrentPhase(PomodoroPhase.IDLE);
-        setSessions([]);
-        setPomodorosInCycle(0);
-        setTimeRemainingInSeconds(WORK_DURATION_MINUTES * 60);
-        setActiveView(AppView.TIMER);
-        setCurrentTimerTaskName(null);
-      }
-    });
-
-    // Unsubscribe on component unmount
-    return () => unsubscribe();
-  }, []);
+  }, [currentUser, currentPhase, timeRemainingInSeconds, pomodorosInCycle, currentTimerTaskName, liveDescription, activeTimerPhaseBeforePause]);
 
   const fetchSessions = useCallback(async () => {
     if (currentUser) {
@@ -193,7 +193,9 @@ const App: React.FC = () => {
     handleAppPhaseChange(PomodoroPhase.IDLE);
     setCurrentTimerTaskName(null);
     setLiveDescription('');
-    localStorage.removeItem('pomodoroTimerState'); // Explicitly clear on stop
+    if (currentUser) {
+      localStorage.removeItem(`pomodoroTimerState_${currentUser.id}`);
+    }
   };
   const handleStartBreakSession = () => {
     setLiveDescription(''); // Clear live description when a break starts
