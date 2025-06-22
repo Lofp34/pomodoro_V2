@@ -24,6 +24,7 @@ const App: React.FC = () => {
   // Edit Session Modal
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [sessionToEdit, setSessionToEdit] = useState<PomodoroSession | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [pomodorosInCycle, setPomodorosInCycle] = useState(0); 
   const [timeRemainingInSeconds, setTimeRemainingInSeconds] = useState(WORK_DURATION_MINUTES * 60);
@@ -155,18 +156,30 @@ const App: React.FC = () => {
 
   // For new session description
   const handleSaveDescription = async (data: { taskName: string; description: string }) => {
-    if (currentUser && taskForDescription) {
+    if (!currentUser || !taskForDescription || isSaving) return;
+
+    setIsSaving(true);
+    try {
       await supabaseService.savePomodoroSession({
-        taskName: taskForDescription.name, // Use original name for saving
+        taskName: taskForDescription.name,
         durationMinutes: taskForDescription.duration,
         taskDescription: data.description,
       });
-      fetchSessions(); 
+      await fetchSessions(); 
+      
+      // Close modal and reset state AFTER successful save
+      setIsDescriptionModalOpen(false);
+      setTaskForDescription(null);
+      setCurrentTimerTaskName(null); 
+      handleAppPhaseChange(PomodoroPhase.BREAK); 
+
+    } catch (error) {
+      console.error("Failed to save session:", error);
+      // It's good practice to show an error to the user in the UI
+      alert("Erreur: Impossible d'enregistrer la session. Veuillez vérifier votre connexion et réessayer.");
+    } finally {
+      setIsSaving(false);
     }
-    setIsDescriptionModalOpen(false);
-    setTaskForDescription(null);
-    setCurrentTimerTaskName(null); // Clear task name after session fully logged
-    handleAppPhaseChange(PomodoroPhase.BREAK); // Go to break after description
   };
 
   // For editing existing session
@@ -324,6 +337,7 @@ const App: React.FC = () => {
             onSave={handleSaveDescription}
             taskNameLabel="Travail accompli pour la tâche :"
             isEditing={false} // This modal is for new descriptions, task name is fixed
+            isSaving={isSaving} // Pass saving state to the component
           />
         )}
       </Modal>
@@ -344,6 +358,7 @@ const App: React.FC = () => {
             initialDescription={sessionToEdit.taskDescription}
             onSave={handleSaveEditedSession}
             isEditing={true} // Enable task name editing
+            isSaving={isSaving}
           />
         )}
       </Modal>
