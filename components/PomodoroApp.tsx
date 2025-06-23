@@ -7,7 +7,7 @@ import History from './History';
 import Chat from './Chat';
 import Modal from './Modal';
 import DictationInput from './DictationInput';
-import { TimerIcon, HistoryIcon, ChatIcon, LogoutIcon, InfoIcon, MenuIcon } from './icons';
+import { TimerIcon, HistoryIcon, ChatIcon, LogoutIcon, InfoIcon, MenuIcon, ChevronDownIcon } from './icons';
 import { geminiService } from '../services/geminiService';
 import { notificationService } from '../services/notificationService';
 
@@ -345,8 +345,6 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
         return <Chat 
           currentUser={user} 
           sessions={sessions} 
-          isMenuVisible={false}
-          onShowMenu={() => {}}
         />;
       
       // Default view is the Focus Stream
@@ -377,13 +375,18 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
                 value={newRemark}
                 onChange={(e) => setNewRemark(e.target.value)}
               />
-              <button
-                onClick={handleSaveNewRemark}
-                disabled={!newRemark.trim() || isSavingRemark}
-                className="mt-3 px-6 py-2 bg-teal-600 text-white font-semibold rounded-lg shadow-md hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-opacity-75 transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSavingRemark ? 'Enregistrement...' : 'Enregistrer la remarque'}
-              </button>
+              <div className="flex items-center space-x-4 mt-3">
+                <button
+                  onClick={handleSaveNewRemark}
+                  disabled={!newRemark.trim() || isSavingRemark}
+                  className="px-6 py-2 bg-teal-600 text-white font-semibold rounded-lg shadow-md hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-opacity-75 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSavingRemark ? 'Enregistrement...' : 'Enregistrer la remarque'}
+                </button>
+                <div className="text-gray-400">
+                  <ChevronDownIcon className="w-8 h-8 animate-bounce" />
+                </div>
+              </div>
             </div>
 
             <div className="mt-8">
@@ -408,12 +411,15 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
     icon: React.ReactNode;
   }> = ({ view, label, icon }) => (
     <button
-      onClick={() => handleNavigate(view)}
+      onClick={() => {
+        handleNavigate(view);
+        setMenuVisible(false);
+      }}
       className={`w-full flex items-center p-3 rounded-lg transition-colors text-lg ${
-        activeView === view ? 'bg-teal-500/20 text-teal-300' : 'hover:bg-gray-700'
+        activeView === view ? 'bg-teal-500/20 text-teal-300' : 'text-gray-400 hover:bg-gray-700/50 hover:text-white'
       }`}
     >
-      {icon}
+      <span className="mr-4">{icon}</span>
       <span className="ml-3">{label}</span>
     </button>
   );
@@ -481,8 +487,6 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
           {activeView === AppView.CHAT && <Chat 
             currentUser={user} 
             sessions={sessions} 
-            isMenuVisible={false} // Chat now manages its own menu button on mobile
-            onShowMenu={() => {}}    // This is now handled by the main hamburger
           />}
         </div>
       </main>
