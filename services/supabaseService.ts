@@ -123,6 +123,14 @@ export const supabaseService = {
     if (error) throw error;
   },
 
+  async updateRemark(remarkId: string, content: string): Promise<void> {
+    const { error } = await supabase
+      .from('remarks')
+      .update({ content })
+      .eq('id', remarkId);
+    if (error) throw error;
+  },
+
   async deleteRemark(remarkId: string): Promise<void> {
     const { error } = await supabase.from('remarks').delete().eq('id', remarkId);
     if (error) throw error;

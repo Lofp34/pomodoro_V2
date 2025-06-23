@@ -240,6 +240,16 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
     }
   };
 
+  const handleUpdateRemark = async (remarkId: string, content: string) => {
+    try {
+      await supabaseService.updateRemark(remarkId, content);
+      await fetchHistory(); // Refresh history to show the updated remark
+    } catch (error) {
+      console.error("Failed to update remark:", error);
+      alert("Erreur lors de la mise à jour de la remarque.");
+    }
+  };
+
   const handleSaveDescription = async (data: { taskName: string; description: string }) => {
     if (!taskForDescription || isSaving) return;
 
@@ -310,50 +320,62 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
   };
 
   const renderView = () => {
+    // The main view is now the "Focus Stream" which is a combination of Timer and History.
+    // The other views are secondary.
     switch (activeView) {
-      case AppView.TIMER:
+      case AppView.CHAT:
+        return <Chat currentUser={user} sessions={sessions} />;
+      
+      // Default view is the Focus Stream
+      default:
         return (
+          <>
             <Timer
                 currentUser={user}
                 appPhase={currentPhase}
                 timeToDisplayInSeconds={timeRemainingInSeconds}
                 pomodorosCompleted={pomodorosInCycle}
                 currentWorkTaskName={currentTimerTaskName}
-                liveDescription={liveDescription}
-                onLiveDescriptionChange={setLiveDescription}
+                liveDescription={liveDescription} // This might be deprecated with the new design
+                onLiveDescriptionChange={setLiveDescription} // This might be deprecated
                 onStartWorkSession={handleStartWorkSession}
                 onPauseSession={handlePauseSession}
                 onResumeSession={handleResumeSession}
                 onStopSession={handleStopSession}
                 onStartBreakSession={handleStartBreakSession}
             />
+            
+            <div className="mt-8">
+              <h3 className="text-lg font-semibold text-gray-300 mb-2">Journal de bord</h3>
+              <textarea
+                className="w-full bg-gray-800 border border-gray-700 rounded-md p-3 text-gray-200 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition"
+                rows={3}
+                placeholder="Notez une idée, une distraction, une réflexion..."
+                value={newRemark}
+                onChange={(e) => setNewRemark(e.target.value)}
+              />
+              <button
+                onClick={handleSaveNewRemark}
+                disabled={!newRemark.trim() || isSavingRemark}
+                className="mt-3 px-6 py-2 bg-teal-600 text-white font-semibold rounded-lg shadow-md hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-opacity-75 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSavingRemark ? 'Enregistrement...' : 'Enregistrer la remarque'}
+              </button>
+            </div>
+
+            <div className="mt-8">
+              <History 
+                currentUser={user} 
+                sessions={sessions} 
+                refreshSessions={fetchHistory} 
+                onEditSession={handleOpenEditModal}
+                onDeleteSession={handleDeleteSession}
+                onDeleteRemark={handleDeleteRemark}
+                onUpdateRemark={handleUpdateRemark}
+              />
+            </div>
+          </>
         );
-      case AppView.HISTORY:
-        return <History 
-                    currentUser={user} 
-                    sessions={sessions} 
-                    refreshSessions={fetchHistory} 
-                    onEditSession={handleOpenEditModal}
-                    onDeleteSession={handleDeleteSession}
-                    onDeleteRemark={handleDeleteRemark}
-                />;
-      case AppView.CHAT:
-        return <Chat currentUser={user} sessions={sessions} />;
-      default:
-        return  <Timer
-                    currentUser={user}
-                    appPhase={currentPhase}
-                    timeToDisplayInSeconds={timeRemainingInSeconds}
-                    pomodorosCompleted={pomodorosInCycle}
-                    currentWorkTaskName={currentTimerTaskName}
-                    liveDescription={liveDescription}
-                    onLiveDescriptionChange={setLiveDescription}
-                    onStartWorkSession={handleStartWorkSession}
-                    onPauseSession={handlePauseSession}
-                    onResumeSession={handleResumeSession}
-                    onStopSession={handleStopSession}
-                    onStartBreakSession={handleStartBreakSession}
-                />;
     }
   };
 
@@ -382,8 +404,8 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-teal-400 mb-6 md:mb-10 text-center md:text-left font-orbitron">{APP_NAME}</h1>
           <div className="space-y-2">
-            <NavLink view={AppView.TIMER} label="Minuteur" icon={<TimerIcon className="w-6 h-6" />} />
-            <NavLink view={AppView.HISTORY} label="Historique" icon={<HistoryIcon className="w-6 h-6" />} />
+            <NavLink view={AppView.TIMER} label="Focus Stream" icon={<TimerIcon className="w-6 h-6" />} />
+            <NavLink view={AppView.HISTORY} label="Revue & Analyse" icon={<HistoryIcon className="w-6 h-6" />} />
             <NavLink view={AppView.CHAT} label="Chat IA" icon={<ChatIcon className="w-6 h-6" />} />
           </div>
         </div>
@@ -408,28 +430,9 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
 
       <main className="flex-grow p-4 md:p-8 overflow-y-auto">
         {renderView()}
-        
-        {activeView === AppView.TIMER && (
-          <div className="mt-8">
-            <h3 className="text-lg font-semibold text-gray-300 mb-2">Remarques rapides</h3>
-            <textarea
-              className="w-full bg-gray-800 border border-gray-700 rounded-md p-3 text-gray-200 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition"
-              rows={3}
-              placeholder="Notez une idée, une distraction, une réflexion..."
-              value={newRemark}
-              onChange={(e) => setNewRemark(e.target.value)}
-            />
-            <button
-              onClick={handleSaveNewRemark}
-              disabled={!newRemark.trim() || isSavingRemark}
-              className="mt-3 px-6 py-2 bg-teal-600 text-white font-semibold rounded-lg shadow-md hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-opacity-75 transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSavingRemark ? 'Enregistrement...' : 'Enregistrer la remarque'}
-            </button>
-          </div>
-        )}
       </main>
 
+      {/* New Session Description Modal */}
       <Modal
         isOpen={isDescriptionModalOpen}
         onClose={() => {
@@ -444,7 +447,7 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
         {taskForDescription && (
           <DictationInput
             initialTaskName={taskForDescription.name}
-            initialDescription={liveDescription}
+            initialDescription={liveDescription} // This will now be empty, but kept for structure
             onSave={handleSaveDescription}
             taskNameLabel="Travail accompli pour la tâche :"
             isEditing={false}
@@ -453,6 +456,7 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
         )}
       </Modal>
 
+      {/* Edit Existing Session Modal */}
       <Modal
         isOpen={isEditModalOpen}
         onClose={() => {
