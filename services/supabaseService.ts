@@ -1,5 +1,5 @@
 import { createClient, Session, User } from '@supabase/supabase-js';
-import { PomodoroSession } from '../types';
+import { PomodoroSession, Remark } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -58,99 +58,73 @@ export const supabaseService = {
     return { unsubscribe: () => authListener?.subscription.unsubscribe() };
   },
 
-  async savePomodoroSession(sessionData: Omit<PomodoroSession, 'id' | 'userId' | 'createdAt'>): Promise<PomodoroSession> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated.");
-
-    const newSessionPayload = {
-      user_id: user.id,
-      task_name: sessionData.taskName,
-      duration_minutes: sessionData.durationMinutes,
-      task_description: sessionData.taskDescription,
-    };
-    
-    // Assuming table name is 'pomodoro_sessions'
-    const { data, error } = await supabase
-      .from('pomodoro_sessions')
-      .insert(newSessionPayload)
-      .select()
-      .single();
-
-    if (error) throw error;
-    
-    // Map back to camelCase if needed
-    return {
-      id: data.id,
-      userId: data.user_id,
-      createdAt: data.created_at,
-      durationMinutes: data.duration_minutes,
-      taskName: data.task_name,
-      taskDescription: data.task_description,
-    };
+  async savePomodoroSession(session: {
+    taskName: string;
+    durationMinutes: number;
+    taskDescription: string;
+  }): Promise<void> {
+    const { error } = await supabase.from('pomodoro_sessions').insert({
+      task_name: session.taskName,
+      duration_minutes: session.durationMinutes,
+      task_description: session.taskDescription,
+    });
+    if (error) {
+      console.error('Supabase error:', error);
+      throw error;
+    }
   },
 
   async getPomodoroSessions(): Promise<PomodoroSession[]> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return [];
-
     const { data, error } = await supabase
       .from('pomodoro_sessions')
-      .select('*')
-      .eq('user_id', user.id)
+      .select('id, created_at, taskName:task_name, taskDescription:task_description, durationMinutes:duration_minutes, user_id')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    
-    return data.map(session => ({
-      id: session.id,
-      userId: session.user_id,
-      createdAt: session.created_at,
-      durationMinutes: session.duration_minutes,
-      taskName: session.task_name,
-      taskDescription: session.task_description,
-    }));
+    return data || [];
   },
 
-  async updatePomodoroSession(sessionId: string, updatedData: Partial<Omit<PomodoroSession, 'id' | 'userId' | 'createdAt'>>): Promise<PomodoroSession> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated.");
-
-    const updatePayload: { [key: string]: any } = {};
-    if (updatedData.durationMinutes !== undefined) updatePayload.duration_minutes = updatedData.durationMinutes;
-    if (updatedData.taskName !== undefined) updatePayload.task_name = updatedData.taskName;
-    if (updatedData.taskDescription !== undefined) updatePayload.task_description = updatedData.taskDescription;
-
-
+  async getRemarks(): Promise<Remark[]> {
     const { data, error } = await supabase
-      .from('pomodoro_sessions')
-      .update(updatePayload)
-      .eq('id', sessionId)
-      .eq('user_id', user.id)
-      .select()
-      .single();
-
-    if (error) throw error;
+      .from('remarks')
+      .select('id, created_at, content, user_id')
+      .order('created_at', { ascending: false });
     
-    return {
-      id: data.id,
-      userId: data.user_id,
-      createdAt: data.created_at,
-      durationMinutes: data.duration_minutes,
-      taskName: data.task_name,
-      taskDescription: data.task_description,
-    };
+    if (error) {
+      // If the table doesn't exist, this will fail. We can ignore this for now.
+      console.warn("Could not fetch remarks, table might not exist yet.", error.message);
+      return [];
+    }
+    return data || [];
   },
 
-  async deletePomodoroSession(sessionId: string): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated.");
+  async saveRemark(content: string): Promise<void> {
+    const { error } = await supabase.from('remarks').insert({ content });
+    if (error) throw error;
+  },
+
+  async updatePomodoroSession(sessionId: string, updates: { taskName?: string; taskDescription?: string }) {
+    const dbUpdates: { [key: string]: any } = {};
+    if (updates.taskName) dbUpdates.task_name = updates.taskName;
+    if (updates.taskDescription) dbUpdates.task_description = updates.taskDescription;
 
     const { error } = await supabase
       .from('pomodoro_sessions')
-      .delete()
-      .eq('id', sessionId)
-      .eq('user_id', user.id);
+      .update(dbUpdates)
+      .eq('id', sessionId);
+    if (error) throw error;
+  },
 
+  async deletePomodoroSession(sessionId: string): Promise<void> {
+    const { error } = await supabase
+      .from('pomodoro_sessions')
+      .delete()
+      .eq('id', sessionId);
+    if (error) throw error;
+  },
+
+  async deleteRemark(remarkId: string): Promise<void> {
+    const { error } = await supabase.from('remarks').delete().eq('id', remarkId);
     if (error) throw error;
   },
 };

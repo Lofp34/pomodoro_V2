@@ -1,4 +1,3 @@
-
 export interface User {
   id: string;
   email: string; // Or any other user identifying information
@@ -8,12 +7,21 @@ export interface User {
 // The database type jsonb allows for flexible querying if it is indeed JSON.
 export interface PomodoroSession {
   id: string;
-  userId: string;
-  createdAt: string; // ISO string date
-  durationMinutes: number;
+  created_at: string;
   taskName: string;
-  taskDescription: string; 
+  taskDescription: string;
+  durationMinutes: number;
+  user_id: string;
 }
+
+export interface Remark {
+  id: string;
+  created_at: string;
+  content: string;
+  user_id: string;
+}
+
+export type HistoryItem = PomodoroSession | Remark;
 
 export interface ChatMessage {
   id: string;

@@ -30,6 +30,8 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
   const [sessionToEdit, setSessionToEdit] = useState<PomodoroSession | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [liveDescription, setLiveDescription] = useState('');
+  const [newRemark, setNewRemark] = useState('');
+  const [isSavingRemark, setIsSavingRemark] = useState(false);
 
   const [pomodorosInCycle, setPomodorosInCycle] = useState(0); 
   const [timeRemainingInSeconds, setTimeRemainingInSeconds] = useState(WORK_DURATION_MINUTES * 60);
@@ -117,14 +119,21 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
     }
   }, [user.id, currentPhase, timeRemainingInSeconds, pomodorosInCycle, currentTimerTaskName, liveDescription, activeTimerPhaseBeforePause]);
 
-  const fetchSessions = useCallback(async () => {
-      const fetchedSessions = await supabaseService.getPomodoroSessions();
-      setSessions(fetchedSessions);
+  const fetchHistory = useCallback(async () => {
+      const [fetchedSessions, fetchedRemarks] = await Promise.all([
+        supabaseService.getPomodoroSessions(),
+        supabaseService.getRemarks()
+      ]);
+
+      const combinedHistory = [...fetchedSessions, ...fetchedRemarks]
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      setSessions(combinedHistory as any); // Using 'any' because of mixed types, will be handled in History component
   }, []);
 
   useEffect(() => {
-    fetchSessions();
-  }, [fetchSessions]);
+    fetchHistory();
+  }, [fetchHistory]);
 
   // Core Timer Logic
   useEffect(() => {
@@ -215,6 +224,22 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
     handleAppPhaseChange(PomodoroPhase.BREAK);
   }
 
+  const handleSaveNewRemark = async () => {
+    if (!newRemark.trim() || isSavingRemark) return;
+
+    setIsSavingRemark(true);
+    try {
+      await supabaseService.saveRemark(newRemark);
+      setNewRemark(''); // Clear input after saving
+      await fetchHistory(); // Refresh history to show the new remark
+    } catch (error) {
+      console.error("Failed to save remark:", error);
+      alert("Erreur lors de la sauvegarde de la remarque. La table 'remarks' existe-t-elle ?");
+    } finally {
+      setIsSavingRemark(false);
+    }
+  };
+
   const handleSaveDescription = async (data: { taskName: string; description: string }) => {
     if (!taskForDescription || isSaving) return;
 
@@ -226,7 +251,7 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
         durationMinutes: durationInMinutes,
         taskDescription: data.description,
       });
-      await fetchSessions(); 
+      await fetchHistory(); 
       
       setIsDescriptionModalOpen(false);
       setTaskForDescription(null);
@@ -254,7 +279,7 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
           taskName: data.taskName,
           taskDescription: data.description,
         });
-        fetchSessions();
+        fetchHistory();
         setIsEditModalOpen(false);
         setSessionToEdit(null);
       } catch (error) {
@@ -267,13 +292,23 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
   const handleDeleteSession = async (sessionId: string) => {
       try {
         await supabaseService.deletePomodoroSession(sessionId);
-        fetchSessions();
+        fetchHistory(); // Refresh list
       } catch (error) {
         console.error("Failed to delete session:", error);
         alert("Erreur lors de la suppression de la session.");
       }
   };
   
+  const handleDeleteRemark = async (remarkId: string) => {
+    try {
+      await supabaseService.deleteRemark(remarkId);
+      fetchHistory(); // Refresh list
+    } catch (error) {
+      console.error("Failed to delete remark:", error);
+      alert("Erreur lors de la suppression de la remarque.");
+    }
+  };
+
   const renderView = () => {
     switch (activeView) {
       case AppView.TIMER:
@@ -297,9 +332,10 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
         return <History 
                     currentUser={user} 
                     sessions={sessions} 
-                    refreshSessions={fetchSessions} 
+                    refreshSessions={fetchHistory} 
                     onEditSession={handleOpenEditModal}
                     onDeleteSession={handleDeleteSession}
+                    onDeleteRemark={handleDeleteRemark}
                 />;
       case AppView.CHAT:
         return <Chat currentUser={user} sessions={sessions} />;
@@ -372,6 +408,26 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
 
       <main className="flex-grow p-4 md:p-8 overflow-y-auto">
         {renderView()}
+        
+        {activeView === AppView.TIMER && (
+          <div className="mt-8">
+            <h3 className="text-lg font-semibold text-gray-300 mb-2">Remarques rapides</h3>
+            <textarea
+              className="w-full bg-gray-800 border border-gray-700 rounded-md p-3 text-gray-200 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition"
+              rows={3}
+              placeholder="Notez une idée, une distraction, une réflexion..."
+              value={newRemark}
+              onChange={(e) => setNewRemark(e.target.value)}
+            />
+            <button
+              onClick={handleSaveNewRemark}
+              disabled={!newRemark.trim() || isSavingRemark}
+              className="mt-3 px-6 py-2 bg-teal-600 text-white font-semibold rounded-lg shadow-md hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-opacity-75 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSavingRemark ? 'Enregistrement...' : 'Enregistrer la remarque'}
+            </button>
+          </div>
+        )}
       </main>
 
       <Modal
