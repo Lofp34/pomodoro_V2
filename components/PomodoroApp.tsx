@@ -7,7 +7,7 @@ import History from './History';
 import Chat from './Chat';
 import Modal from './Modal';
 import DictationInput from './DictationInput';
-import { TimerIcon, HistoryIcon, ChatIcon, LogoutIcon, InfoIcon, MenuIcon, SparklesIcon } from './icons';
+import { TimerIcon, HistoryIcon, ChatIcon, LogoutIcon, InfoIcon, MenuIcon } from './icons';
 import { geminiService } from '../services/geminiService';
 import { notificationService } from '../services/notificationService';
 
@@ -43,8 +43,6 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [isDirty, setIsDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isCoaching, setIsCoaching] = useState(false);
-  const [coachingResult, setCoachingResult] = useState<string | null>(null);
 
   // This new effect handles app visibility changes to sync the timer
   useEffect(() => {
@@ -339,27 +337,6 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
     await supabaseService.logout();
   };
 
-  const handleCoachingRequest = async () => {
-    setIsCoaching(true);
-    setCoachingResult(null);
-    setError(null);
-    try {
-      const { data, error: funcError } = await supabase.functions.invoke('get-instant-coaching', {
-        body: { sessions },
-      });
-
-      if (funcError) throw funcError;
-      if (data.error) throw new Error(data.error);
-
-      setCoachingResult(data.advice);
-    } catch (err: any) {
-      setError(`Erreur du coaching : ${err.message}`);
-      setCoachingResult(null);
-    } finally {
-      setIsCoaching(false);
-    }
-  };
-
   const renderView = () => {
     // The main view is now the "Focus Stream" which is a combination of Timer and History.
     // The other views are secondary.
@@ -420,17 +397,6 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
     }
   };
 
-  const CoachingButton = () => (
-    <button
-      onClick={handleCoachingRequest}
-      disabled={isCoaching}
-      className={`w-full flex items-center p-3 rounded-lg transition-colors text-lg hover:bg-gray-700 disabled:opacity-50`}
-    >
-      <SparklesIcon className="w-6 h-6 text-yellow-400" />
-      <span className="ml-3">Coaching IA</span>
-    </button>
-  );
-
   const NavLink: React.FC<{
     view: AppView;
     label: string;
@@ -474,7 +440,6 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
           <h1 className="text-2xl md:text-3xl font-bold text-teal-400 mb-6 md:mb-10 text-center md:text-left font-orbitron">{APP_NAME}</h1>
           <div className="space-y-2">
             <NavLink view={AppView.TIMER} label="Focus Stream" icon={<TimerIcon className="w-6 h-6" />} />
-            <CoachingButton />
             <NavLink view={AppView.CHAT} label="Chat IA" icon={<ChatIcon className="w-6 h-6" />} />
           </div>
         </div>
@@ -546,22 +511,6 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
             isEditing={true}
             isSaving={isSaving}
           />
-        )}
-      </Modal>
-
-      <Modal 
-        isOpen={isCoaching || coachingResult !== null}
-        title={coachingResult ? "Votre Coach Personnel" : "Analyse en cours..."}
-        onClose={() => setCoachingResult(null)}
-        showCloseButton={!isCoaching}
-      >
-        {isCoaching ? (
-          <div className="flex justify-center items-center space-x-3 p-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-400"></div>
-            <p className="text-gray-300 text-lg">Votre coach analyse votre activité...</p>
-          </div>
-        ) : (
-          <p className="text-gray-200 text-lg leading-relaxed p-4">{coachingResult}</p>
         )}
       </Modal>
     </div>
