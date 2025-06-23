@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, PomodoroSession, PomodoroPhase, AppView } from '../types';
-import { supabaseService } from '../services/supabaseService';
+import { User, PomodoroSession, PomodoroPhase, AppView, Remark, HistoryItem } from '../types';
+import { supabase, supabaseService } from '../services/supabaseService';
 import { WORK_DURATION_MINUTES, SHORT_BREAK_DURATION_MINUTES, LONG_BREAK_DURATION_MINUTES, APP_NAME, DOCUMENT_TITLE } from '../constants';
 import Timer from './Timer';
 import History from './History';
 import Chat from './Chat';
 import Modal from './Modal';
 import DictationInput from './DictationInput';
-import { TimerIcon, HistoryIcon, ChatIcon, LogoutIcon, InfoIcon } from './icons';
+import { TimerIcon, HistoryIcon, ChatIcon, LogoutIcon, InfoIcon, MenuIcon, SparklesIcon } from './icons';
 import { geminiService } from '../services/geminiService';
 import { notificationService } from '../services/notificationService';
 
@@ -38,6 +38,13 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
   const [activeTimerPhaseBeforePause, setActiveTimerPhaseBeforePause] = useState<PomodoroPhase>(PomodoroPhase.RUNNING);
   const [currentTimerTaskName, setCurrentTimerTaskName] = useState<string | null>(null);
   const [targetEndTime, setTargetEndTime] = useState<number | null>(null);
+
+  const [isMenuVisible, setMenuVisible] = useState(true);
+  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
+  const [isDirty, setIsDirty] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isCoaching, setIsCoaching] = useState(false);
+  const [coachingResult, setCoachingResult] = useState<string | null>(null);
 
   // This new effect handles app visibility changes to sync the timer
   useEffect(() => {
@@ -319,6 +326,38 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
     }
   };
 
+  const handleNavigate = (view: AppView) => {
+    setActiveView(view);
+    if (view === AppView.CHAT) {
+      setMenuVisible(false);
+    } else {
+      setMenuVisible(true);
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabaseService.logout();
+  };
+
+  const handleCoachingRequest = async () => {
+    setIsCoaching(true);
+    setCoachingResult(null);
+    setError(null);
+    try {
+      const { data, error: funcError } = await supabase.functions.invoke('get-instant-coaching');
+
+      if (funcError) throw funcError;
+      if (data.error) throw new Error(data.error);
+
+      setCoachingResult(data.advice);
+    } catch (err: any) {
+      setError(`Erreur du coaching : ${err.message}`);
+      setCoachingResult(null);
+    } finally {
+      setIsCoaching(false);
+    }
+  };
+
   const renderView = () => {
     // The main view is now the "Focus Stream" which is a combination of Timer and History.
     // The other views are secondary.
@@ -379,33 +418,61 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
     }
   };
 
+  const CoachingButton = () => (
+    <button
+      onClick={handleCoachingRequest}
+      disabled={isCoaching}
+      className={`w-full flex items-center p-3 rounded-lg transition-colors text-lg hover:bg-gray-700 disabled:opacity-50`}
+    >
+      <SparklesIcon className="w-6 h-6 text-yellow-400" />
+      <span className="ml-3">Coaching IA</span>
+    </button>
+  );
+
   const NavLink: React.FC<{
     view: AppView;
     label: string;
     icon: React.ReactNode;
   }> = ({ view, label, icon }) => (
     <button
-      onClick={() => setActiveView(view)}
-      className={`flex items-center space-x-3 px-4 py-3 rounded-lg w-full text-left transition-colors duration-200
-                  ${activeView === view 
-                    ? 'bg-teal-600 text-white shadow-lg' 
-                    : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}
-      title={label}
-      aria-current={activeView === view ? 'page' : undefined}
+      onClick={() => handleNavigate(view)}
+      className={`w-full flex items-center p-3 rounded-lg transition-colors text-lg ${
+        activeView === view ? 'bg-teal-500/20 text-teal-300' : 'hover:bg-gray-700'
+      }`}
     >
       {icon}
-      <span className="font-medium">{label}</span>
+      <span className="ml-3">{label}</span>
     </button>
   );
 
+  const showMenuButton = (
+    <div className="md:hidden">
+      {!isMenuVisible && activeView === AppView.CHAT && (
+        <button
+          onClick={() => setMenuVisible(true)}
+          className="fixed top-4 left-4 z-50 bg-gray-700/50 p-2 rounded-full backdrop-blur-sm text-white hover:bg-gray-600 transition-colors"
+          aria-label="Afficher le menu"
+        >
+          <MenuIcon className="w-6 h-6" />
+        </button>
+      )}
+    </div>
+  );
+
   return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-gray-900 text-gray-100">
-      <nav className="w-full md:w-64 bg-gray-800 p-4 md:p-6 space-y-4 md:space-y-6 flex-shrink-0 shadow-lg flex flex-col">
+    <div className="flex flex-col md:flex-row h-screen bg-gray-900 text-white font-sans overflow-hidden">
+      {showMenuButton}
+      <nav 
+        className={`w-full md:w-64 bg-gray-800 p-4 md:p-6 space-y-4 md:space-y-6 flex-shrink-0 shadow-lg flex flex-col transition-transform duration-300 ease-in-out z-40
+          md:static md:translate-y-0
+          ${isMenuVisible ? 'translate-y-0' : '-translate-y-full absolute'}
+        `}
+      >
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-teal-400 mb-6 md:mb-10 text-center md:text-left font-orbitron">{APP_NAME}</h1>
           <div className="space-y-2">
             <NavLink view={AppView.TIMER} label="Focus Stream" icon={<TimerIcon className="w-6 h-6" />} />
-            <NavLink view={AppView.HISTORY} label="Revue & Analyse" icon={<HistoryIcon className="w-6 h-6" />} />
+            <CoachingButton />
             <NavLink view={AppView.CHAT} label="Chat IA" icon={<ChatIcon className="w-6 h-6" />} />
           </div>
         </div>
@@ -417,7 +484,7 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
             </div>
           )}
           <button
-            onClick={onLogout}
+            onClick={handleLogout}
             className="flex items-center space-x-3 px-4 py-3 rounded-lg w-full text-left text-gray-300 hover:bg-red-700 hover:text-white transition-colors duration-200"
             title="Logout"
           >
@@ -428,8 +495,11 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
         </div>
       </nav>
 
-      <main className="flex-grow p-4 md:p-8 overflow-y-auto">
-        {renderView()}
+      <main className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+          {activeView === AppView.TIMER && renderView()}
+          {activeView === AppView.CHAT && <Chat currentUser={user} sessions={sessions} />}
+        </div>
       </main>
 
       {/* New Session Description Modal */}
@@ -474,6 +544,22 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
             isEditing={true}
             isSaving={isSaving}
           />
+        )}
+      </Modal>
+
+      <Modal 
+        isOpen={isCoaching || coachingResult !== null}
+        title={coachingResult ? "Votre Coach Personnel" : "Analyse en cours..."}
+        onClose={() => setCoachingResult(null)}
+        showCloseButton={!isCoaching}
+      >
+        {isCoaching ? (
+          <div className="flex justify-center items-center space-x-3 p-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-400"></div>
+            <p className="text-gray-300 text-lg">Votre coach analyse votre activité...</p>
+          </div>
+        ) : (
+          <p className="text-gray-200 text-lg leading-relaxed p-4">{coachingResult}</p>
         )}
       </Modal>
     </div>

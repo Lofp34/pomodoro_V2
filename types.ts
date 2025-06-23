@@ -41,7 +41,6 @@ export enum PomodoroPhase {
 
 export enum AppView {
   TIMER = 'TIMER',
-  HISTORY = 'HISTORY',
   CHAT = 'CHAT',
 }
 
