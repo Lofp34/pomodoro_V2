@@ -344,7 +344,9 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
     setCoachingResult(null);
     setError(null);
     try {
-      const { data, error: funcError } = await supabase.functions.invoke('get-instant-coaching');
+      const { data, error: funcError } = await supabase.functions.invoke('get-instant-coaching', {
+        body: { sessions },
+      });
 
       if (funcError) throw funcError;
       if (data.error) throw new Error(data.error);
