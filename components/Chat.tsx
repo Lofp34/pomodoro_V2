@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { PomodoroSession, User, ChatMessage, GroundingChunk, WebSource } from '../types';
 import { geminiService } from '../services/geminiService';
@@ -97,27 +96,26 @@ const Chat: React.FC<ChatProps> = ({ currentUser, sessions }) => {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-160px)] max-w-3xl mx-auto bg-gray-800 shadow-2xl rounded-lg">
-      <div className="p-4 border-b border-gray-700">
-        <h2 className="text-xl font-semibold text-teal-400">Chat IA avec Pomodoro Intelligence</h2>
-        <p className="text-xs text-gray-400">Posez des questions sur vos tâches enregistrées.</p>
-      </div>
-
-      {error && (
-         <div className="p-3 m-4 bg-red-800 border border-red-600 rounded-md text-red-100 flex items-center text-sm">
+    <div className="flex flex-col h-full bg-gray-800 rounded-lg shadow-xl">
+      <header className="px-4 sm:px-6 py-4 border-b border-gray-700 flex items-center space-x-4">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-100">Chat IA</h1>
+          <p className="text-sm text-gray-400">Analyse de vos tâches.</p>
+        </div>
+      </header>
+      <div className="flex-1 p-6 overflow-y-auto space-y-4">
+        {error && (
+          <div className="p-4 bg-red-900/50 border border-red-700/60 rounded-lg text-red-200 flex items-center space-x-3">
             <AlertTriangleIcon className="w-5 h-5 mr-2 flex-shrink-0" />
             {error}
-        </div>
-      )}
-       {!geminiService.isConfigured() && (
-         <div className="p-3 m-4 bg-yellow-800 border border-yellow-600 rounded-md text-yellow-100 flex items-center text-sm">
+          </div>
+        )}
+        {!geminiService.isConfigured() && (
+          <div className="p-4 bg-yellow-900/50 border border-yellow-700/60 rounded-lg text-yellow-200 flex items-center space-x-3">
             <InfoIcon className="w-5 h-5 mr-2 flex-shrink-0" />
             {API_KEY_ERROR_MESSAGE} AI features are disabled.
-        </div>
-      )}
-
-
-      <div className="flex-grow p-4 space-y-4 overflow-y-auto">
+          </div>
+        )}
         {messages.map((msg) => (
           <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-xs md:max-w-md lg:max-w-lg px-4 py-2 rounded-xl shadow ${
@@ -140,7 +138,6 @@ const Chat: React.FC<ChatProps> = ({ currentUser, sessions }) => {
         ))}
         <div ref={messagesEndRef} />
       </div>
-
       <div className="p-4 border-t border-gray-700">
         <div className="flex items-center space-x-2">
           <input

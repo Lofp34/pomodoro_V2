@@ -39,7 +39,7 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
   const [currentTimerTaskName, setCurrentTimerTaskName] = useState<string | null>(null);
   const [targetEndTime, setTargetEndTime] = useState<number | null>(null);
 
-  const [isMenuVisible, setMenuVisible] = useState(true);
+  const [isMenuVisible, setMenuVisible] = useState(false);
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [isDirty, setIsDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -342,7 +342,12 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
     // The other views are secondary.
     switch (activeView) {
       case AppView.CHAT:
-        return <Chat currentUser={user} sessions={sessions} />;
+        return <Chat 
+          currentUser={user} 
+          sessions={sessions} 
+          isMenuVisible={false}
+          onShowMenu={() => {}}
+        />;
       
       // Default view is the Focus Stream
       default:
@@ -413,31 +418,24 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
     </button>
   );
 
-  const showMenuButton = (
-    <div className="md:hidden">
-      {!isMenuVisible && activeView === AppView.CHAT && (
-        <button
-          onClick={() => setMenuVisible(true)}
-          className="fixed top-4 left-4 z-50 bg-gray-700/50 p-2 rounded-full backdrop-blur-sm text-white hover:bg-gray-600 transition-colors"
-          aria-label="Afficher le menu"
-        >
-          <MenuIcon className="w-6 h-6" />
-        </button>
-      )}
-    </div>
-  );
-
   return (
-    <div className="flex flex-col md:flex-row h-screen bg-gray-900 text-white font-sans overflow-hidden">
-      {showMenuButton}
+    <div className="h-screen bg-gray-900 text-white font-sans flex flex-col">
+      {/* Overlay */}
+      {isMenuVisible && (
+        <div 
+          className="fixed inset-0 bg-black/60 z-30" 
+          onClick={() => setMenuVisible(false)}
+        ></div>
+      )}
+
+      {/* Sidebar Navigation */}
       <nav 
-        className={`w-full md:w-64 bg-gray-800 p-4 md:p-6 space-y-4 md:space-y-6 flex-shrink-0 shadow-lg flex flex-col transition-transform duration-300 ease-in-out z-40
-          md:static md:translate-y-0
-          ${isMenuVisible ? 'translate-y-0' : '-translate-y-full absolute'}
+        className={`fixed top-0 left-0 h-full w-64 bg-gray-800 p-6 space-y-6 shadow-lg flex flex-col transition-transform duration-300 ease-in-out z-40
+          ${isMenuVisible ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-teal-400 mb-6 md:mb-10 text-center md:text-left font-orbitron">{APP_NAME}</h1>
+          <h2 className="text-2xl font-bold text-teal-400 mb-10">Menu</h2>
           <div className="space-y-2">
             <NavLink view={AppView.TIMER} label="Focus Stream" icon={<TimerIcon className="w-6 h-6" />} />
             <NavLink view={AppView.CHAT} label="Chat IA" icon={<ChatIcon className="w-6 h-6" />} />
@@ -463,9 +461,29 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
       </nav>
 
       <main className="flex-1 flex flex-col overflow-hidden">
+        {/* App Header */}
+        <header className="flex-shrink-0 bg-gray-900/80 backdrop-blur-sm border-b border-gray-700/50 z-10">
+          <div className="flex items-center p-4">
+            <button 
+              onClick={() => setMenuVisible(true)} 
+              className="p-2 mr-2 text-gray-300 hover:text-white"
+              aria-label="Ouvrir le menu"
+            >
+              <MenuIcon className="w-6 h-6" />
+            </button>
+            <h1 className="text-xl font-bold text-teal-400 font-orbitron">{APP_NAME}</h1>
+          </div>
+        </header>
+
+        {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
           {activeView === AppView.TIMER && renderView()}
-          {activeView === AppView.CHAT && <Chat currentUser={user} sessions={sessions} />}
+          {activeView === AppView.CHAT && <Chat 
+            currentUser={user} 
+            sessions={sessions} 
+            isMenuVisible={false} // Chat now manages its own menu button on mobile
+            onShowMenu={() => {}}    // This is now handled by the main hamburger
+          />}
         </div>
       </main>
 
