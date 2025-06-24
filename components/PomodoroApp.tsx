@@ -256,27 +256,24 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
   };
 
   const handleSaveDescription = async (data: { taskName: string; description: string }) => {
-    if (!taskForDescription || isSaving) return;
-
+    if (!taskForDescription) return;
     setIsSaving(true);
     try {
-      const durationInMinutes = Math.round(taskForDescription.duration);
       await supabaseService.savePomodoroSession({
-        taskName: taskForDescription.name,
-        durationMinutes: durationInMinutes,
+        userId: user.id,
+        taskName: data.taskName,
+        durationMinutes: taskForDescription.duration,
         taskDescription: data.description,
       });
-      await fetchHistory(); 
-      
       setIsDescriptionModalOpen(false);
       setTaskForDescription(null);
       setCurrentTimerTaskName(null); 
       setLiveDescription('');
-      handleAppPhaseChange(PomodoroPhase.BREAK); 
-
-    } catch (error) {
+      await fetchHistory();
+      handleAppPhaseChange(PomodoroPhase.BREAK);
+    } catch (error: any) {
       console.error("Failed to save session:", error);
-      alert("Erreur: Impossible d'enregistrer la session. Veuillez vérifier votre connexion et réessayer.");
+      setError(`Erreur lors de la sauvegarde de la session : ${error.message}`);
     } finally {
       setIsSaving(false);
     }
@@ -290,16 +287,13 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
   const handleSaveEditedSession = async (data: { taskName: string; description: string }) => {
     if (sessionToEdit) {
       try {
-        await supabaseService.updatePomodoroSession(sessionToEdit.id, {
-          taskName: data.taskName,
-          taskDescription: data.description,
-        });
-        fetchHistory();
+        await supabaseService.updatePomodoroSession(sessionToEdit.id, data);
         setIsEditModalOpen(false);
         setSessionToEdit(null);
-      } catch (error) {
-        console.error("Failed to update session:", error);
-        alert("Erreur lors de la mise à jour de la session.");
+        await fetchHistory(); // Refresh list
+      } catch (error: any) {
+        console.error("Failed to save edited session:", error);
+        setError(`Erreur lors de la sauvegarde : ${error.message}`);
       }
     }
   };

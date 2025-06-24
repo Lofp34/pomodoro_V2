@@ -59,11 +59,13 @@ export const supabaseService = {
   },
 
   async savePomodoroSession(session: {
+    userId: string;
     taskName: string;
     durationMinutes: number;
     taskDescription: string;
   }): Promise<void> {
     const { error } = await supabase.from('pomodoro_sessions').insert({
+      user_id: session.userId,
       task_name: session.taskName,
       duration_minutes: session.durationMinutes,
       task_description: session.taskDescription,

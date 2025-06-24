@@ -1,4 +1,4 @@
-export const WORK_DURATION_MINUTES = 25;
+export const WORK_DURATION_MINUTES = 10 / 60; // 10 secondes pour le test
 export const SHORT_BREAK_DURATION_MINUTES = 5;
 export const LONG_BREAK_DURATION_MINUTES = 15;
 
