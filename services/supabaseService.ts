@@ -64,12 +64,12 @@ export const supabaseService = {
     durationMinutes: number;
     taskDescription: string;
   }): Promise<void> {
-    const { error } = await supabase.from('pomodoro_sessions').insert({
+    const { error } = await supabase.from('pomodoro_sessions').insert([{
       user_id: session.userId,
       task_name: session.taskName,
       duration_minutes: session.durationMinutes,
       task_description: session.taskDescription,
-    });
+    }]);
     if (error) {
       console.error('Supabase error:', error);
       throw error;
