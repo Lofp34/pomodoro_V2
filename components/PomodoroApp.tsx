@@ -262,7 +262,7 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
       await supabaseService.savePomodoroSession({
         userId: user.id,
         taskName: data.taskName,
-        durationMinutes: taskForDescription.duration,
+        durationMinutes: Math.round(taskForDescription.duration),
         taskDescription: data.description,
       });
       setIsDescriptionModalOpen(false);
