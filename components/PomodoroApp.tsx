@@ -5,7 +5,7 @@ import { WORK_DURATION_MINUTES, SHORT_BREAK_DURATION_MINUTES, LONG_BREAK_DURATIO
 import Timer from './Timer';
 import History from './History';
 import Chat from './Chat';
-import Modal from './Modal';
+import Modal from './Modal'; 
 import DictationInput from './DictationInput';
 import { TimerIcon, HistoryIcon, ChatIcon, LogoutIcon, InfoIcon, MenuIcon, ChevronDownIcon } from './icons';
 import { geminiService } from '../services/geminiService';
@@ -219,6 +219,36 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
     setLiveDescription('');
     localStorage.removeItem(`pomodoroTimerState_${user.id}`);
   };
+
+  const handleStopAndSaveSession = async () => {
+    if (!currentTimerTaskName) return;
+
+    const durationSeconds = (WORK_DURATION_MINUTES * 60) - timeRemainingInSeconds;
+    // Do not save if less than a few seconds passed
+    if (durationSeconds < 5) {
+      handleStopSession(); // Just cancel it
+      return;
+    }
+
+    const durationMinutes = Math.round(durationSeconds / 60);
+
+    setIsSaving(true);
+    try {
+      await supabaseService.savePomodoroSession({
+        userId: user.id,
+        taskName: currentTimerTaskName,
+        durationMinutes: durationMinutes,
+        taskDescription: liveDescription,
+      });
+      await fetchHistory();
+    } catch (error: any) {
+      setError(`Erreur lors de la sauvegarde de la session interrompue : ${error.message}`);
+    } finally {
+      setIsSaving(false);
+      handleStopSession(); // Reset state after saving
+    }
+  };
+
   const handleStartBreakSession = () => {
     setLiveDescription('');
     const breakDuration = (pomodorosInCycle > 0 && pomodorosInCycle % 4 === 0) 
@@ -357,6 +387,7 @@ const PomodoroApp: React.FC<PomodoroAppProps> = ({ user, onLogout }) => {
                 onPauseSession={handlePauseSession}
                 onResumeSession={handleResumeSession}
                 onStopSession={handleStopSession}
+                onStopAndSaveSession={handleStopAndSaveSession}
                 onStartBreakSession={handleStartBreakSession}
             />
             

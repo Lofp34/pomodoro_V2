@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PomodoroPhase, User } from '../types';
-import { PlayIcon, PauseIcon, StopIcon } from './icons'; // Removed ResetIcon as Stop serves this purpose now for IDLE state.
+import { PlayIcon, PauseIcon, StopIcon, SaveIcon } from './icons';
 
 interface TimerProps {
   currentUser: User | null;
@@ -14,6 +14,7 @@ interface TimerProps {
   onPauseSession: () => void;
   onResumeSession: () => void;
   onStopSession: () => void; // Resets current work session to IDLE
+  onStopAndSaveSession: () => void; // New handler for stopping and saving
   onStartBreakSession: () => void;
 }
 
@@ -35,6 +36,7 @@ const Timer: React.FC<TimerProps> = ({
   onPauseSession,
   onResumeSession,
   onStopSession,
+  onStopAndSaveSession,
   onStartBreakSession,
 }) => {
   const [localTaskName, setLocalTaskName] = useState('');
@@ -137,12 +139,22 @@ const Timer: React.FC<TimerProps> = ({
         )}
 
         {(isTimerEffectivelyRunning || appPhase === PomodoroPhase.PAUSED) && (
-          <button
-            onClick={handleStop} // Stop always goes to IDLE, clears task
-            className="px-8 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition-all duration-150 ease-in-out transform hover:scale-105 flex items-center"
-          >
-            <StopIcon className="w-6 h-6 mr-2" /> Arrêter
-          </button>
+          <>
+            {currentWorkTaskName && ( // Only show "Stop & Save" for work sessions
+              <button
+                onClick={onStopAndSaveSession}
+                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition-all duration-150 ease-in-out transform hover:scale-105 flex items-center"
+              >
+                <SaveIcon className="w-6 h-6 mr-2" /> Arrêter & Sauver
+              </button>
+            )}
+            <button
+              onClick={handleStop} // This now acts as "Cancel"
+              className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition-all duration-150 ease-in-out transform hover:scale-105 flex items-center"
+            >
+              <StopIcon className="w-6 h-6 mr-2" /> Annuler
+            </button>
+          </>
         )}
       </div>
       
