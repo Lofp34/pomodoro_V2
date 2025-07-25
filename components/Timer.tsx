@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PomodoroPhase, User } from '../types';
 import { PlayIcon, PauseIcon, StopIcon } from './icons'; // Removed ResetIcon as Stop serves this purpose now for IDLE state.
+import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
+import { MicIcon, StopIcon as StopMicIcon } from './icons';
 
 interface TimerProps {
   currentUser: User | null;
@@ -38,6 +40,41 @@ const Timer: React.FC<TimerProps> = ({
   onStartBreakSession,
 }) => {
   const [localTaskName, setLocalTaskName] = useState('');
+  const [isDictating, setIsDictating] = useState(false);
+  const liveDescriptionRef = useRef(liveDescription);
+  const {
+    transcript,
+    listening,
+    resetTranscript,
+    browserSupportsSpeechRecognition,
+  } = useSpeechRecognition();
+  
+  // Keep the ref updated with the latest liveDescription value
+  useEffect(() => {
+    liveDescriptionRef.current = liveDescription;
+  }, [liveDescription]);
+
+  // Handle transcript updates for live dictation
+  useEffect(() => {
+    if (listening && transcript) {
+      // Append transcript to live description (1STREAM, mot par mot)
+      const newDescription = liveDescriptionRef.current + transcript + " ";
+      onLiveDescriptionChange(newDescription);
+      resetTranscript();
+    }
+  }, [transcript, listening, onLiveDescriptionChange, resetTranscript]);
+
+  const handleToggleDictation = () => {
+    if (listening) {
+      SpeechRecognition.stopListening();
+      setIsDictating(false);
+    } else {
+      resetTranscript();
+      // Try without continuous mode first
+      SpeechRecognition.startListening({ language: 'fr-FR' });
+      setIsDictating(true);
+    }
+  };
 
   // Reset local task name if app goes to IDLE and it wasn't a stop action that cleared it
   useEffect(() => {
@@ -151,14 +188,32 @@ const Timer: React.FC<TimerProps> = ({
           <label htmlFor="live-description" className="block text-sm font-medium text-gray-400 mb-2 text-center">
             Notes sur la tâche en cours...
           </label>
-          <textarea
-            id="live-description"
-            value={liveDescription}
-            onChange={(e) => onLiveDescriptionChange(e.target.value)}
-            placeholder="Écrivez ici ce que vous faites, les idées, les blocages..."
-            className="w-full h-24 px-4 py-3 bg-gray-700 border border-gray-600 rounded-md shadow-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-gray-100 text-sm resize-none"
-            aria-label="Description de la tâche en direct"
-          />
+          <div className="flex">
+            <textarea
+              id="live-description"
+              value={liveDescription}
+              onChange={(e) => onLiveDescriptionChange(e.target.value)}
+              placeholder="Écrivez ici ce que vous faites, les idées, les blocages..."
+              className="flex-1 h-24 px-4 py-3 bg-gray-700 border border-gray-600 rounded-l-md shadow-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-gray-100 text-sm resize-none"
+              aria-label="Description de la tâche en direct"
+            />
+            {browserSupportsSpeechRecognition && (
+              <button
+                onClick={handleToggleDictation}
+                className={`flex items-center justify-center px-4 rounded-r-md shadow-sm text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 transition-colors ${
+                  isDictating
+                  ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
+                  : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
+                }`}
+                aria-label={isDictating ? "Arrêter la dictée" : "Dicter"}
+              >
+                {isDictating ? <StopMicIcon className="w-5 h-5" /> : <MicIcon className="w-5 h-5" />}
+              </button>
+            )}
+          </div>
+          {isDictating && (
+            <p className="text-sm text-center text-blue-400 animate-pulse mt-2">Écoute en cours...</p>
+          )}
         </div>
       )}
       
