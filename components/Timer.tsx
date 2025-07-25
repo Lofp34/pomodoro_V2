@@ -58,7 +58,8 @@ const Timer: React.FC<TimerProps> = ({
   useEffect(() => {
     if (listening && transcript) {
       // Append transcript to live description (1STREAM, mot par mot)
-      onLiveDescriptionChange(liveDescriptionRef.current + transcript + " ");
+      const newDescription = liveDescriptionRef.current + transcript + " ";
+      onLiveDescriptionChange(newDescription);
       resetTranscript();
     }
   }, [transcript, listening, onLiveDescriptionChange, resetTranscript]);
@@ -69,7 +70,8 @@ const Timer: React.FC<TimerProps> = ({
       setIsDictating(false);
     } else {
       resetTranscript();
-      SpeechRecognition.startListening({ continuous: true, language: 'fr-FR' });
+      // Try without continuous mode first
+      SpeechRecognition.startListening({ language: 'fr-FR' });
       setIsDictating(true);
     }
   };
